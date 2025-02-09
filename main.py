@@ -6,3 +6,4 @@ ids = IDS("network_data.csv")
 # ids.train_model()
 
 ids.detect()
+# ids.save_logs()

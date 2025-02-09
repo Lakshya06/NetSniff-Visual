@@ -2,23 +2,28 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.ensemble import IsolationForest
+import logging
 
 class IDS:
     def __init__(self, file):
         self.file = file
         self.df_scaled = None
         self.iso_forest = IsolationForest(contamination=0.05, random_state=42)
+        logging.basicConfig(filename="anomalies.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+
 
     def preprocess_data(self):
         df = pd.read_csv("network_data.csv")
         df.columns = ["src_mac", "dst_mac", "protocol", "src_ip", "dst_ip", "src_port", "dst_port", "tcp_flags", "timestamp", "packet_size"]
 
         # converting timestamp into float
-        df["timestamp"] = df["timestamp"].astype(float)
+        df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce")
+
+        df["packet_size"] = pd.to_numeric(df["packet_size"], errors="coerce")
 
         # converting src port and dest port into numeric
-        df["src_port"] = pd.to_numeric(df["src_port"], errors="coerce")
-        df["dst_port"] = pd.to_numeric(df["dst_port"], errors="coerce")
+        df["src_port"] = pd.to_numeric(df["src_port"], errors="coerce").fillna(-1)
+        df["dst_port"] = pd.to_numeric(df["dst_port"], errors="coerce").fillna(-1)
 
         # computing inter arrival time - time gap b/w packets
         df["inter_arrival_time"] = df.groupby("src_ip")["timestamp"].diff().fillna(0)
@@ -65,4 +70,15 @@ class IDS:
 
         for i, pred in enumerate(predictions):
             if pred == -1:
-                print(f"Alert: Anomaly detected! {i}")
+                print(f"Alert: Anomaly detected! in row {i}")
+                print(self.df_scaled.iloc[i])
+        
+        self.save_logs()
+
+    def save_logs(self):
+        # Configure logging to write anomalies to a log file
+        detected_anomalies = self.df_scaled[self.df_scaled["anomaly"] == "Anomaly"]
+        if not detected_anomalies.empty:
+            for index, row in detected_anomalies.iterrows():
+                log_message = f"Alert: Anomaly detected at row {index} - {row.to_dict()}"
+                logging.info(log_message)
